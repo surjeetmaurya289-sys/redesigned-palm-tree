@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Cloud Share & Runner Studio</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            background-color: #f4f6f9;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            border: none;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .btn-blue { background-color: #3498db; }
+        .btn-blue:hover { background-color: #2980b9; }
+        .btn-green { background-color: #27ae60; }
+        .btn-green:hover { background-color: #219653; }
+        .btn-purple { background-color: #8e44ad; }
+        .btn-purple:hover { background-color: #732d91; }
+        
+        .upload-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        .upload-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #ddd;
+        }
+        .pane-header {
+            background: #ecf0f1;
+            padding: 10px 15px;
+            font-weight: bold;
+            font-size: 13px;
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        textarea {
+            flex: 1;
+            width: 100%;
+            padding: 15px;
+            border: none;
+            resize: none;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            background-color: #fff;
+            outline: none;
+            line-height: 1.5;
+        }
+        iframe {
+            flex: 1;
+            width: 100%;
+            border: none;
+            background-color: #fff;
+        }
+        #fileName {
+            font-size: 13px;
+            color: #bdc3c7;
+        }
+        /* Modal Popup for Link */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .modal-content h3 { margin-bottom: 10px; color: #333; }
+        .modal-content input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>HTML Share Studio</h2>
+        <div class="controls">
+            <span id="fileName">Koi file select nahi hai</span>
+            <div class="upload-wrapper">
+                <button class="btn btn-blue">📁 HTML Upload Karein</button>
+                <input type="file" id="fileInput" accept=".html, .htm" onchange="loadHtmlFile(event)">
+            </div>
+            <button class="btn btn-purple" onclick="generateShareLink()">🔗 Shareable Link Banayein</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Code Editor Pane -->
+        <div class="pane">
+            <div class="pane-header">
+                <span>HTML Code Editor</span>
+                <button class="btn btn-green" style="padding: 4px 8px; font-size: 11px;" onclick="runCode()">Run / Refresh</button>
+            </div>
+            <textarea id="codeEditor" placeholder="Yahan code likhein ya file upload karein..." oninput="runCode()"></textarea>
+        </div>
+
+        <!-- Live Preview Pane -->
+        <div class="pane" style="border-right: none;">
+            <div class="pane-header"><span>Live Output Preview</span></div>
+            <iframe id="previewFrame"></iframe>
+        </div>
+    </div>
+
+    <!-- Link Modal -->
+    <div id="linkModal" class="modal">
+        <div class="modal-content">
+            <h3>Aapka Shareable Link Taiyar Hai!</h3>
+            <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Yeh link kisi ko bhi bhejenge, toh seedha aapka HTML page run ho jayega:</p>
+            <input type="text" id="shareableLinkInput" readonly>
+            <div class="modal-actions">
+                <button class="btn btn-blue" onclick="copyLink()">Link Copy Karein</button>
+                <button class="btn" style="background-color: #e74c3c;" onclick="closeModal()">Band Karein</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Page load hone par check karein ki kya URL me koi shared code mojood hai
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const encodedCode = urlParams.get('code');
+            if (encodedCode) {
+                try {
+                    // Decode karke editor me daalna aur run karna
+                    const decodedCode = decodeURIComponent(escape(atob(encodedCode)));
+                    document.getElementById('codeEditor').value = decodedCode;
+                    document.getElementById('fileName').innerText = "Shared File Loaded";
+                    runCode();
+                    return;
+                } catch (e) {
+                    console.error("Invalid shared code");
+                }
+            }
+
+            // Default sample code agar koi file ya link na ho
+            document.getElementById('codeEditor').value = `<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial; text-align: center; padding-top: 40px; background: #eef2f3; }
+        h1 { color: #2c3e50; }
+        p { color: #555; }
+        .box { background: white; padding: 20px; border-radius: 8px; display: inline-block; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>Welcome!</h1>
+        <p>Apni HTML file upload karein ya yahan code edit karein.</p>
+    </div>
+</body>
+</html>`;
+            runCode();
+        };
+
+        // File upload function
+        function loadHtmlFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileName').innerText = `File: ${file.name}`;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('codeEditor').value = e.target.result;
+                runCode();
+            };
+            reader.readAsText(file);
+        }
+
+        // Run code in iframe
+        function runCode() {
+            const code = document.getElementById('codeEditor').value;
+            const iframe = document.getElementById('previewFrame');
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            iframeDoc.open();
+            iframeDoc.write(code);
+            iframeDoc.close();
+        }
+
+        // Generate Shareable Link using Base64 URL Encoding
+        function generateShareLink() {
+            const code = document.getElementById('codeEditor').value;
+            if (!code.trim()) {
+                alert("Pehle kuch HTML code daalein!");
+                return;
+            }
+
+            // Code ko secure base64 string me convert karna taaki URL me safely pass ho sake
+            const encoded = btoa(unescape(encodeURIComponent(code)));
+            const currentUrl = window.location.href.split('?')[0];
+            const finalLink = `${currentUrl}?code=${encoded}`;
+
+            document.getElementById('shareableLinkInput').value = finalLink;
+            document.getElementById('linkModal').style.display = 'flex';
+        }
+
+        function copyLink() {
+            const linkInput = document.getElementById('shareableLinkInput');
+            linkInput.select();
+            linkInput.setSelectionRange(0, 99999); // For mobile devices
+            navigator.clipboard.writeText(linkInput.value);
+            alert("Link successfully copy ho gaya!");
+        }
+
+        function closeModal() {
+            document.getElementById('linkModal').style.display = 'none';
+        }
+    </script>
+
+</body>
+  </html>
